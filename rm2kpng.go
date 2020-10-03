@@ -32,64 +32,68 @@ const (
 	maxPaletteLen = 256
 )
 
-// RGBA uses uint32 naively because computers are fast enough for this tool to
-// go fast for my use-case, who cares
-type RGBA struct {
-	R, G, B, A uint32
-}
-
-// getRm2kPaletteList will retrieve an Rm2k-compatible palette for an image
-func getRm2kPaletteList(src image.Image) ([]color.Color, error) {
-	paletteList := make([]color.Color, 0, 255)
-	paletteMap := make(map[RGBA]int32)
-	imageSize := src.Bounds()
+// getRm2kPaletteList will build a Rm2k-compatible palette for an image by
+// looping over every pixel.
+//
+// An error is returned if there are more than 256 colors used.
+func getRm2kPaletteList(src image.Image) (color.Palette, error) {
+	paletteList := make(color.Palette, 0, maxPaletteLen)
+	paletteMap := make(map[color.RGBA]int32)
+	imageSize := src.Bounds().Size()
 
 	// Detect type and first palette color (ie. transparency)
-	if imageSize.Size().X == 480 &&
-		imageSize.Size().Y == 256 {
+	if imageSize.X == 480 &&
+		imageSize.Y == 256 {
 		// Detect Rm2k/3 chipset
 		const (
 			transparentTileX = 296
 			transparentTileY = 135
 		)
 		r, g, b, a := src.At(transparentTileX, transparentTileY).RGBA()
-		rgba := RGBA{
-			R: r,
-			G: g,
-			B: b,
-			A: a,
+		rgba := color.RGBA{
+			R: uint8(r),
+			G: uint8(g),
+			B: uint8(b),
+			A: uint8(a),
 		}
-		paletteList = append(paletteList, color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a)})
+		paletteList = append(paletteList, rgba)
 		paletteMap[rgba]++
 	} else {
-		// *Assume* Charset and assume top-left pixel is transparent
-		// note(Jae): may want to improve this heuristic but for now lets do the simplest thing
-		//			  might experiment with the idea that most-used pixel == transparent?
+		// *Assume* Charset/Picture/Faceset/etc and assume top-left pixel is transparent
+
+		// note(Jae):
+		// may want to improve this heuristic but for now lets do the simplest thing
+		// might experiment with the idea that most-used pixel == transparent?
+		//
+		// i could also provide a config file users can place in their working directory
+		// so that the transparent color used can be fixed to a specific color
 		const (
 			transparentX = 0
 			transparentY = 0
 		)
 		r, g, b, a := src.At(transparentX, transparentY).RGBA()
-		rgba := RGBA{
-			R: r,
-			G: g,
-			B: b,
-			A: a,
+		rgba := color.RGBA{
+			R: uint8(r),
+			G: uint8(g),
+			B: uint8(b),
+			A: uint8(a),
 		}
-		paletteList = append(paletteList, color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a)})
+		paletteList = append(paletteList, rgba)
 		paletteMap[rgba]++
 	}
 
-	for y := 0; y < imageSize.Size().Y; y++ {
-		for x := 0; x < imageSize.Size().X; x++ {
+	// Loop over all the pixels and build a palette
+	for y := 0; y < imageSize.Y; y++ {
+		for x := 0; x < imageSize.X; x++ {
 			r, g, b, a := src.At(x, y).RGBA()
-			rgba := RGBA{
-				R: r,
-				G: g,
-				B: b,
-				A: a,
+			rgba := color.RGBA{
+				R: uint8(r),
+				G: uint8(g),
+				B: uint8(b),
+				A: uint8(a),
 			}
 			if _, ok := paletteMap[rgba]; ok {
+				paletteMap[rgba]++
 				continue
 			}
 			paletteList = append(paletteList, color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a)})
@@ -131,7 +135,11 @@ func comparePixels(src image.Image, dest image.Image) error {
 	return nil
 }
 
-func ConvertToRm2kImage(srcFile io.Reader) (*image.Paletted, error) {
+// ConvertPNGToRm2kPNG will losslessly convert any PNG file
+//
+// If the PNG provided is already an 8-bit PNG that uses 256 colors or less in its
+// palette, then return an error
+func ConvertPNGToRm2kPNG(srcFile io.Reader) (*image.Paletted, error) {
 	src, err := png.Decode(srcFile)
 	if err != nil {
 		return nil, err
@@ -139,7 +147,8 @@ func ConvertToRm2kImage(srcFile io.Reader) (*image.Paletted, error) {
 	if srcPaletted, ok := src.(*image.Paletted); ok {
 		// NOTE(Jae): Most Rm2k assets I've seen have 256 colors in its palette
 		// regardless of whether they're all used or not but our conversion process
-		// can go lower and still work, so we leave it for now.
+		// can go lower and still work, so if this PNG uses 256 colors or less, do
+		// not convert.
 		if len(srcPaletted.Palette) <= maxPaletteLen {
 			return nil, ErrRm2kCompatiblePNG{
 				paletteLen: len(srcPaletted.Palette),
@@ -154,6 +163,9 @@ func ConvertToRm2kImage(srcFile io.Reader) (*image.Paletted, error) {
 
 	dst := image.NewPaletted(src.Bounds(), paletteList)
 	drawer := draw.Drawer(draw.Src)
+	// NOTE(Jae):
+	// May want to provide the ability to do lossy conversion later?
+	// It'd have to be explicit opt-in.
 	//if dither {
 	//	drawer = draw.FloydSteinberg
 	//}

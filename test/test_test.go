@@ -14,7 +14,7 @@ func convertImageByFilename(src string) (*image.Paletted, error) {
 	if err != nil {
 		return nil, err
 	}
-	convertedImage, err := rm2kpng.ConvertToRm2kImage(srcFile)
+	convertedImage, err := rm2kpng.ConvertPNGToRm2kPNG(srcFile)
 	if err != nil {
 		srcFile.Close()
 		return nil, err

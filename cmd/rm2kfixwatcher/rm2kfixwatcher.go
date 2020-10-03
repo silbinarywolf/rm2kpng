@@ -22,7 +22,7 @@ func convertFileInPlace(srcFilename string) error {
 	if err != nil {
 		return err
 	}
-	convertedImage, err := rm2kpng.ConvertToRm2kImage(srcFile)
+	convertedImage, err := rm2kpng.ConvertPNGToRm2kPNG(srcFile)
 	if err != nil {
 		srcFile.Close()
 		return err
@@ -77,7 +77,7 @@ func main() {
 	log.SetFlags(0)
 
 	argsWithoutProg := os.Args[1:]
-	if len(os.Args) <= 0 {
+	if len(argsWithoutProg) == 0 {
 		log.Printf(`
 rm2kfixwatcher is a tool for auto-fixing PNG files so they work in RPG Maker. It will "watch" an RPG Maker project folder for changes and automatically convert PNG files to an 8-bit PNG (if they do not exceed 255 colors)
 		
@@ -91,8 +91,9 @@ rm2kfixwatcher <file_or_folder>
 	
 Why does this tool exist?
 -------------------------
-This tool exists so that users can work in paint tools they're comfortable in without needing to think about managing their palette (until they exceed the max 255 colors that is!).
+This tool exists so that users can work in paint tools they're comfortable in without needing to think about managing their palette (until they exceed the max 256 colors that is!).
 `)
+		log.Printf("\nPress any key to close")
 		// wait for input before closing, more beginner friendly
 		// i remember being like, 9 years old trying to use a CLI tool. Like what the heck is this.
 		// why does it instant close.
@@ -103,17 +104,20 @@ This tool exists so that users can work in paint tools they're comfortable in wi
 	path := argsWithoutProg[0]
 	fileinfo, err := os.Stat(path)
 	if os.IsNotExist(err) {
-		log.Fatal("File or folder does not exist.")
+		fileinfo, err = os.Stat(path)
+		if os.IsNotExist(err) {
+			log.Fatal("File or folder does not exist.")
+		}
 	}
 	if !fileinfo.IsDir() {
 		log.Fatal("Must be a folder.")
 	}
+
+	// Validate that the user has given an RPG Maker folder
 	rpgRuntimePath := path + string(filepath.Separator) + "RPG_RT.exe"
 	if _, err := os.Stat(rpgRuntimePath); err != nil {
 		log.Fatalf("Unable to find RPG_RT in given folder: %s", rpgRuntimePath)
 	}
-
-	// Get
 	charsetPath := path + string(filepath.Separator) + "Charset"
 	if _, err := os.Stat(charsetPath); err != nil {
 		log.Fatalf("Unable to find \"Charset\" in given folder: %s", charsetPath)
@@ -136,7 +140,7 @@ This tool exists so that users can work in paint tools they're comfortable in wi
 	log.Printf("Waiting for you to change files in Charset/Chipset folders...\n")
 
 	//
-	filesToUpdate := make([]string, 0, 255)
+	filesToUpdate := make([]string, 0, 16)
 	for {
 		filesToUpdate = filesToUpdate[:0]
 		select {
