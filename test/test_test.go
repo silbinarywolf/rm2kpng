@@ -1,7 +1,6 @@
 package rm2kpngtest
 
 import (
-	"fmt"
 	"image"
 	"os"
 	"testing"
@@ -23,11 +22,11 @@ func convertImageByFilename(src string) (*image.Paletted, error) {
 	return convertedImage, nil
 }
 
-// todo(Jae): Write actual tests for the api
-func TestData(t *testing.T) {
-	image, err := convertImageByFilename("object3_taken_from_rm2k_survivor.png")
-	if err != nil {
-		panic(err)
+func TestAlreadyValidData(t *testing.T) {
+	_, err := convertImageByFilename("object3_taken_from_rm2k_survivor.png")
+	if _, ok := err.(rm2kpng.ErrRm2kCompatiblePNG); !ok {
+		t.Fail()
+		return
 	}
-	fmt.Printf("Palette %d, err: %v", len(image.Palette), err)
+	//fmt.Printf("Palette %d, err: %v", len(image.Palette), err)
 }

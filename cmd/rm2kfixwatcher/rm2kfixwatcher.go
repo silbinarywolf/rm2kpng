@@ -13,6 +13,14 @@ import (
 	"gopkg.in/fsnotify.v1"
 )
 
+type errOpenFile struct {
+	err error
+}
+
+func (err errOpenFile) Error() string {
+	return err.err.Error()
+}
+
 func convertFileInPlace(srcFilename string) error {
 	const (
 		afterSuffix  = ".afterRm2kFix"
@@ -20,8 +28,9 @@ func convertFileInPlace(srcFilename string) error {
 	)
 	srcFile, err := os.Open(srcFilename)
 	if err != nil {
-		return err
+		return errOpenFile{err: err}
 	}
+
 	convertedImage, err := rm2kpng.ConvertPNGToRm2kPNG(srcFile)
 	if err != nil {
 		srcFile.Close()
@@ -178,19 +187,25 @@ This tool exists so that users can work in paint tools they're comfortable in wi
 					case rm2kpng.ErrRm2kCompatiblePNG:
 						// if file is already compatible, ignore and move on
 						continue FileUpdateLoop
-					case *os.PathError:
-						// NOTE(Jae): In my testing, saving in MS-Paint has a lock
-						// on the file for an indeterminate amount of time, so we
-						// try again a few times before giving up.
-						//
+					case
+						// When testing on Windows and saving with MS-Paint
+						// we get a file in use error for san indeterminate amount of time,
+						// so we try again a few times before giving up.
 						// In my testing, it takes ~3 retries on my machine with a
 						// 10ms sleep
-						retryCount++
-						time.Sleep(10 * time.Millisecond)
-						continue
+						errOpenFile,
+						// When testing on Mac and saving with Pinta, we get an issue
+						// where the image hasn't finished saving yet, so a decoding error
+						// occurs. It takes ~5 retries with 10ms sleep
+						rm2kpng.ErrRm2kDecode:
+						{
+							retryCount++
+							time.Sleep(10 * time.Millisecond)
+							continue
+						}
 					default:
 						// unhandled error
-						log.Fatalf("%T: Failed to convert changed file: %s\nerror: %v", err, path, err)
+						log.Fatalf("%T: Failed to convert changed file: %s\ninternal error: %s", err, path, err)
 					}
 				}
 				log.Printf("Fixed file: %s", path)

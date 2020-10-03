@@ -27,6 +27,16 @@ func (err ErrRm2kCompatiblePNG) Error() string {
 	return fmt.Sprintf("PNG is valid Rm2k png with less than %d colors in its palette. It has %d.", maxPaletteLen, err.paletteLen)
 }
 
+// ErrRm2kDecode is an error that occurs if the image given fails to be decoded.
+// This can occur if the file is corrupted or still being written to.
+type ErrRm2kDecode struct {
+	err error
+}
+
+func (err ErrRm2kDecode) Error() string {
+	return err.err.Error()
+}
+
 const (
 	// maxPaletteLen is the expected palette size of RPG Maker assets
 	maxPaletteLen = 256
@@ -142,7 +152,9 @@ func comparePixels(src image.Image, dest image.Image) error {
 func ConvertPNGToRm2kPNG(srcFile io.Reader) (*image.Paletted, error) {
 	src, err := png.Decode(srcFile)
 	if err != nil {
-		return nil, err
+		return nil, ErrRm2kDecode{
+			err: err,
+		}
 	}
 	if srcPaletted, ok := src.(*image.Paletted); ok {
 		// NOTE(Jae): Most Rm2k assets I've seen have 256 colors in its palette
