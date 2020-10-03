@@ -16,15 +16,13 @@ jobs:
           with:
             go-version: ${{ matrix.go }}
 
-        - name: Build
-          shell: cmd
+        - name: Test Library
           run: |
-            go build -v ./...
+            go test ./test
 
-        - name: Test
-          shell: cmd
+        - name: Build Rm2k Fix Watcher binary
           run: |
-            go test ./...
+            cd cmd/rm2kfixwatcher && go build -v
 
         - name: Artifact
           uses: actions/download-artifact@v2
@@ -48,13 +46,13 @@ jobs:
           with:
             go-version: ${{ matrix.go }}
 
-        - name: Build
+        - name: Test Library
           run: |
-            go build -v ./...
+            go test ./test
 
-        - name: Test
+        - name: Build Rm2k Fix Watcher binary
           run: |
-            go test ./...
+            cd cmd/rm2kfixwatcher && go build -v
 
         - name: Artifact
           uses: actions/download-artifact@v2
@@ -78,13 +76,13 @@ jobs:
           with:
             go-version: ${{ matrix.go }}
 
-        - name: Build
+        - name: Test Library
           run: |
-            go build -v ./...
+            go test ./test
 
-        - name: Test
+        - name: Build Rm2k Fix Watcher binary
           run: |
-            go test ./...
+            cd cmd/rm2kfixwatcher && go build -v
 
         - name: Artifact
           uses: actions/download-artifact@v2
