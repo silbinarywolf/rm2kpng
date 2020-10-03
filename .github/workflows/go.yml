@@ -32,6 +32,7 @@ jobs:
             name: ${{ env.name }}
             path: |
               cmd/rm2kfixwatcher/rm2kfixwatcher.exe
+            if-no-files-found: error
 
   macos:
       runs-on: macOS-latest
@@ -64,6 +65,7 @@ jobs:
             name: ${{ env.name }}
             path: |
               cmd/rm2kfixwatcher/rm2kfixwatcher
+            if-no-files-found: error
 
   linux:
       name: Go ${{ matrix.go }} on Ubuntu
@@ -90,9 +92,10 @@ jobs:
           run: |
             cd cmd/rm2kfixwatcher && go build -v
 
-        - name: Artifact
+        - name: Upload Artifact
           uses: actions/upload-artifact@v2
           with:
             name: ${{ env.name }}
             path: |
               cmd/rm2kfixwatcher/rm2kfixwatcher
+            if-no-files-found: error
