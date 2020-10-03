@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"image/png"
 	"log"
@@ -12,6 +13,14 @@ import (
 	"github.com/silbinarywolf/rm2kpng"
 	"gopkg.in/fsnotify.v1"
 )
+
+var (
+	hasDebug bool
+)
+
+func init() {
+	flag.BoolVar(&hasDebug, "debug", false, "enable this flag to get additional debugging information")
+}
 
 type errOpenFile struct {
 	err error
@@ -84,6 +93,9 @@ func main() {
 
 	// Disable time logging for this app
 	log.SetFlags(0)
+
+	// Parse flags
+	flag.Parse()
 
 	argsWithoutProg := os.Args[1:]
 	if len(argsWithoutProg) == 0 {
@@ -207,7 +219,7 @@ This tool exists so that users can work in paint tools they're comfortable in wi
 						}
 					default:
 						// unhandled error
-						log.Fatalf("%T: Failed to convert changed file: %s\ninternal error: %s", err, path, err)
+						log.Fatalf("Failed to convert changed file: %s\ninternal error: %s", path, err)
 					}
 				}
 				// exit loop if succeeded or retries failed
@@ -215,11 +227,11 @@ This tool exists so that users can work in paint tools they're comfortable in wi
 			}
 			if err != nil {
 				// if retries failed
-				log.Printf("Was unable to fix file: %s, error: %s", path, err)
+				log.Printf("Was unable to fix file: %s, internal error: %s", path, err)
 				continue
 			}
-			log.Printf("Fixed file: %s", path)
-			if retryCount > 1 {
+			log.Printf("Converted file to 8-bit PNG: %s", path)
+			if hasDebug && retryCount > 1 {
 				log.Printf("(retries taken: %d)", retryCount)
 			}
 		}
