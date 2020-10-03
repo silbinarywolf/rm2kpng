@@ -92,7 +92,7 @@ rm2kfixwatcher is a tool for auto-fixing PNG files so they work in RPG Maker. It
 		
 How to use (beginners)
 -------------------------
-The easiest way to use this is to just drag your RPG Maker folder onto this exe file.
+First, make sure you backup your RPG Maker project files to avoid any images becoming corrupted, then to use this drag your RPG Maker folder onto this exe file.
 
 How to use (nerds)
 -------------------------
@@ -146,6 +146,7 @@ This tool exists so that users can work in paint tools they're comfortable in wi
 	watcher.Add(charsetPath)
 	watcher.Add(chipsetPath)
 
+	log.Printf("WARNING: Please backup your RPG Maker project files before using this tool to avoid file corruption.")
 	log.Printf("Waiting for you to change files in Charset/Chipset folders...\n")
 
 	//
@@ -180,9 +181,10 @@ This tool exists so that users can work in paint tools they're comfortable in wi
 		}
 	FileUpdateLoop:
 		for _, path := range filesToUpdate {
-			for retryCount := 1; retryCount <= 10; retryCount++ {
-				// todo(Jae): Add more error types to ignore in switch case
-				if err := convertFileInPlace(path); err != nil {
+			var err error
+			var retryCount int
+			for ; retryCount <= 10; retryCount++ {
+				if err = convertFileInPlace(path); err != nil {
 					switch err := err.(type) {
 					case rm2kpng.ErrRm2kCompatiblePNG:
 						// if file is already compatible, ignore and move on
@@ -208,11 +210,17 @@ This tool exists so that users can work in paint tools they're comfortable in wi
 						log.Fatalf("%T: Failed to convert changed file: %s\ninternal error: %s", err, path, err)
 					}
 				}
-				log.Printf("Fixed file: %s", path)
-				if retryCount > 1 {
-					log.Printf("(retries taken: %d)", retryCount)
-				}
+				// exit loop if succeeded or retries failed
 				break
+			}
+			if err != nil {
+				// if retries failed
+				log.Printf("Was unable to fix file: %s, error: %s", path, err)
+				continue
+			}
+			log.Printf("Fixed file: %s", path)
+			if retryCount > 1 {
+				log.Printf("(retries taken: %d)", retryCount)
 			}
 		}
 	}
