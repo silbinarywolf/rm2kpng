@@ -42,11 +42,32 @@ jobs:
             go-version: ${{ matrix.go }}
 
         - name: Build
-          shell: cmd
           run: |
             go build -v ./...
 
         - name: Test
-          shell: cmd
+          run: |
+            go test ./...
+
+  linux:
+      name: Go ${{ matrix.go }} on Ubuntu
+      runs-on: ubuntu-latest
+      strategy:
+        matrix:
+          go: ['1.15']
+      steps:
+        - name: Check out code into the Go module directory
+          uses: actions/checkout@v2
+
+        - name: Setup Go
+          uses: actions/setup-go@v2
+          with:
+            go-version: ${{ matrix.go }}
+
+        - name: Build
+          run: |
+            go build -v ./...
+
+        - name: Test
           run: |
             go test ./...
