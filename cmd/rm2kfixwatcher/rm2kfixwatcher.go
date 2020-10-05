@@ -168,7 +168,13 @@ This tool exists so that users can work in paint tools they're comfortable in wi
 		select {
 		case event := <-watcher.Events:
 			dir := event.Name
-			// if already added to list of assets to update, continue the outer loop
+			// Ignore if not a create/write event for a file, ignore.
+			// We don't care about removed/renamed/chmoded file changes.
+			if event.Op != fsnotify.Create &&
+				event.Op != fsnotify.Write {
+				continue
+			}
+			// Check If already added to list of Rm2k assets to convert
 			hasFound := false
 			for _, otherDir := range filesToUpdate {
 				if otherDir == dir {
@@ -179,8 +185,8 @@ This tool exists so that users can work in paint tools they're comfortable in wi
 			if hasFound {
 				continue
 			}
+			// if not a .png, ignore
 			if filepath.Ext(dir) != ".png" {
-				// only check for .png file changes
 				continue
 			}
 			filesToUpdate = append(filesToUpdate, dir)
