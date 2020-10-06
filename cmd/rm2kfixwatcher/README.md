@@ -4,8 +4,7 @@ This is a tool that will watch your RPG Maker project directory for file changes
 
 ## Installation
 
-TODO: Jae: Actual add releases
-Visit the releases page here and download it.
+Visit the [releases page here](https://github.com/silbinarywolf/rm2kpng/tags) and download it.
 
 ## How does it work?
 
