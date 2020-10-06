@@ -10,16 +10,23 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/karrick/godirwalk"
 	"github.com/silbinarywolf/rm2kpng"
 	"gopkg.in/fsnotify.v1"
 )
 
 var (
-	hasDebug bool
+	hasDebug      bool
+	isFixOnlyMode bool
+)
+
+const (
+	convertedFileText = "Converted file to 8-bit PNG: %s"
 )
 
 func init() {
-	flag.BoolVar(&hasDebug, "debug", false, "enable this flag to get additional debugging information")
+	flag.BoolVar(&hasDebug, "debug", false, "this flag to get additional debugging information")
+	flag.BoolVar(&isFixOnlyMode, "fix", false, "this flag will only run the fixing tool once and won't watch the directory")
 }
 
 type errOpenFile struct {
@@ -97,8 +104,8 @@ func main() {
 	// Parse flags
 	flag.Parse()
 
-	argsWithoutProg := os.Args[1:]
-	if len(argsWithoutProg) == 0 {
+	args := flag.Args()
+	if len(args) == 0 {
 		log.Printf(`
 rm2kfixwatcher is a tool for auto-fixing PNG files so they work in RPG Maker. It will "watch" an RPG Maker project folder for changes and automatically convert PNG files to an 8-bit PNG (if they do not exceed 255 colors)
 		
@@ -122,30 +129,90 @@ This tool exists so that users can work in paint tools they're comfortable in wi
 		input.Scan()
 		return
 	}
-	path := argsWithoutProg[0]
-	fileinfo, err := os.Stat(path)
-	if os.IsNotExist(err) {
-		fileinfo, err = os.Stat(path)
+
+	// Get path
+	var rm2kAssetPathList []string
+	{
+		path := args[0]
+		fileinfo, err := os.Stat(path)
 		if os.IsNotExist(err) {
-			log.Fatal("File or folder does not exist.")
+			fileinfo, err = os.Stat(path)
+			if os.IsNotExist(err) {
+				log.Fatal("File or folder does not exist.")
+			}
 		}
-	}
-	if !fileinfo.IsDir() {
-		log.Fatal("Must be a folder.")
+		if !fileinfo.IsDir() {
+			log.Fatal("Must be a folder.")
+		}
+
+		// Validate that the user has given an RPG Maker folder
+		rpgRuntimePath := path + string(filepath.Separator) + "RPG_RT.exe"
+		if _, err := os.Stat(rpgRuntimePath); err != nil {
+			log.Fatalf("Unable to find RPG_RT in given folder: %s", rpgRuntimePath)
+		}
+		charsetPath := path + string(filepath.Separator) + "Charset"
+		if _, err := os.Stat(charsetPath); err != nil {
+			log.Fatalf("Unable to find \"Charset\" in given folder: %s", charsetPath)
+		}
+		chipsetPath := path + string(filepath.Separator) + "Chipset"
+		if _, err := os.Stat(chipsetPath); err != nil {
+			log.Fatalf("Unable to find \"Chipset\" in given folder: %s", chipsetPath)
+		}
+		rm2kAssetPathList = []string{
+			charsetPath,
+			chipsetPath,
+		}[:]
 	}
 
-	// Validate that the user has given an RPG Maker folder
-	rpgRuntimePath := path + string(filepath.Separator) + "RPG_RT.exe"
-	if _, err := os.Stat(rpgRuntimePath); err != nil {
-		log.Fatalf("Unable to find RPG_RT in given folder: %s", rpgRuntimePath)
-	}
-	charsetPath := path + string(filepath.Separator) + "Charset"
-	if _, err := os.Stat(charsetPath); err != nil {
-		log.Fatalf("Unable to find \"Charset\" in given folder: %s", charsetPath)
-	}
-	chipsetPath := path + string(filepath.Separator) + "Chipset"
-	if _, err := os.Stat(chipsetPath); err != nil {
-		log.Fatalf("Unable to find \"Chipset\" in given folder: %s", chipsetPath)
+	// Fix files at start-up
+	{
+		filesToUpdate := make([]string, 0, 100)
+		for _, assetDir := range rm2kAssetPathList {
+			err := godirwalk.Walk(assetDir, &godirwalk.Options{
+				Callback: func(osPathname string, de *godirwalk.Dirent) error {
+					if !de.IsRegular() {
+						// ignore directories / symlinks / etc
+						return nil
+					}
+					if filepath.Ext(osPathname) != ".png" {
+						// ignore non- .png
+						return nil
+					}
+					filesToUpdate = append(filesToUpdate, osPathname)
+					return nil
+				},
+				Unsorted: true,
+			})
+			if err != nil {
+				log.Fatalf("Cannot find \"%s\", err: %s", assetDir, err.Error())
+			}
+		}
+		filesConverted := make([]string, 0, len(filesToUpdate))
+		for _, path := range filesToUpdate {
+			if err := convertFileInPlace(path); err != nil {
+				switch err := err.(type) {
+				case rm2kpng.ErrRm2kCompatiblePNG:
+					// if file is already compatible, ignore and move on
+					continue
+				default:
+					// unhandled error
+					log.Printf("Skipping file: %s, error: %s", path, err)
+					continue
+				}
+			}
+			filesConverted = append(filesConverted, path)
+		}
+		if len(filesConverted) == 0 {
+			log.Printf("No files converted.")
+		} else {
+			for _, path := range filesConverted {
+				log.Printf(convertedFileText, path)
+			}
+		}
+		if isFixOnlyMode {
+			// Exit early if only fixing
+			return
+		}
 	}
 
 	// Setup watcher for all RPG Maker asset folders that support transparency
@@ -155,8 +222,9 @@ This tool exists so that users can work in paint tools they're comfortable in wi
 	if err != nil {
 		log.Fatalf("Unable to start file watcher: %v", err)
 	}
-	watcher.Add(charsetPath)
-	watcher.Add(chipsetPath)
+	for _, assetDir := range rm2kAssetPathList {
+		watcher.Add(assetDir)
+	}
 
 	log.Printf("WARNING: Please backup your RPG Maker project files before using this tool to avoid file corruption.")
 	log.Printf("Waiting for you to change files in Charset/Chipset folders...\n")
@@ -236,7 +304,7 @@ This tool exists so that users can work in paint tools they're comfortable in wi
 				log.Printf("Was unable to fix file: %s, internal error: %s", path, err)
 				continue
 			}
-			log.Printf("Converted file to 8-bit PNG: %s", path)
+			log.Printf(convertedFileText, path)
 			if hasDebug && retryCount > 1 {
 				log.Printf("(retries taken: %d)", retryCount)
 			}
