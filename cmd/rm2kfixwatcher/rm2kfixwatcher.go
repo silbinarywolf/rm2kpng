@@ -108,10 +108,18 @@ func main() {
 	if len(args) == 0 {
 		log.Printf(`
 rm2kfixwatcher is a tool for auto-fixing PNG files so they work in RPG Maker. It will "watch" an RPG Maker project folder for changes and automatically convert PNG files to an 8-bit PNG (if they do not exceed 255 colors)
-		
+
+How it works
+-------------------------
+If your PNG files are not already an 8-bit PNG, it will attempt to convert any PNG format to an 8-bit PNG by:
+- Iterating over every pixel and building up a palette of colors
+- It will decide that the top-left corner is the transparent pixel (except for Chipsets, it picks from the transparent tile)
+
+If your PNG file exceeds 256 colors, it will give up on the conversion process and do nothing.
+
 How to use (beginners)
 -------------------------
-First, make sure you backup your RPG Maker project files to avoid any images becoming corrupted, then to use this drag your RPG Maker folder onto this exe file.
+First, make sure you *backup* your RPG Maker project files to avoid any images becoming corrupted, then to use this drag your RPG Maker folder onto this exe file.
 
 How to use (nerds)
 -------------------------
@@ -150,18 +158,32 @@ This tool exists so that users can work in paint tools they're comfortable in wi
 		if _, err := os.Stat(rpgRuntimePath); err != nil {
 			log.Fatalf("Unable to find RPG_RT in given folder: %s", rpgRuntimePath)
 		}
-		charsetPath := path + string(filepath.Separator) + "Charset"
-		if _, err := os.Stat(charsetPath); err != nil {
-			log.Fatalf("Unable to find \"Charset\" in given folder: %s", charsetPath)
+
+		// Get asset folders
+		assetBaseNameList := []string{
+			// Rm2k
+			"Charset",
+			"Chipset",
+			"FaceSet",
+			"Panorama",
+			"Picture",
+			"Monster",
+			"System",
+			// Rm2k3
+			"Backdrop",
+			"Battle2",
+			"BattleCharSet",
+			"BattleWeapon",
+			"Frame",
+			"System2",
 		}
-		chipsetPath := path + string(filepath.Separator) + "Chipset"
-		if _, err := os.Stat(chipsetPath); err != nil {
-			log.Fatalf("Unable to find \"Chipset\" in given folder: %s", chipsetPath)
+		for _, baseName := range assetBaseNameList {
+			assetFolderPath := path + string(filepath.Separator) + baseName
+			if _, err := os.Stat(assetFolderPath); err != nil {
+				continue
+			}
+			rm2kAssetPathList = append(rm2kAssetPathList, assetFolderPath)
 		}
-		rm2kAssetPathList = []string{
-			charsetPath,
-			chipsetPath,
-		}[:]
 	}
 
 	// Fix files at start-up
@@ -175,7 +197,7 @@ This tool exists so that users can work in paint tools they're comfortable in wi
 						return nil
 					}
 					if filepath.Ext(osPathname) != ".png" {
-						// ignore non- .png
+						// ignore non-png
 						return nil
 					}
 					filesToUpdate = append(filesToUpdate, osPathname)
@@ -226,8 +248,11 @@ This tool exists so that users can work in paint tools they're comfortable in wi
 		watcher.Add(assetDir)
 	}
 
-	log.Printf("WARNING: Please backup your RPG Maker project files before using this tool to avoid file corruption.")
-	log.Printf("Waiting for you to change files in Charset/Chipset folders...\n")
+	//
+	log.Printf("Waiting for you to change files in asset folders:\n")
+	for _, assetDir := range rm2kAssetPathList {
+		log.Printf("- %s", filepath.Base(assetDir))
+	}
 
 	//
 	filesToUpdate := make([]string, 0, 16)

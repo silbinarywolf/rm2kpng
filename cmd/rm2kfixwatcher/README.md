@@ -7,6 +7,12 @@ This is a tool that will watch your RPG Maker project directory for file changes
 TODO: Jae: Actual add releases
 Visit the releases page here and download it.
 
+## How does it work?
+
+If your PNG file is not already an 8-bit PNG, it will attempt to convert any PNG format to an 8-bit PNG by:
+- Iterating over every pixel and building up a palette of colors
+- It will decide that the top-left corner is the transparent pixel (except for Chipsets, it picks from the transparent tile)
+
 ## How to use
 
 1) Follow **Installation** instructions above.
