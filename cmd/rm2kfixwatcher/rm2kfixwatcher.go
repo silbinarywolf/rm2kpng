@@ -107,7 +107,7 @@ func main() {
 	args := flag.Args()
 	if len(args) == 0 {
 		log.Printf(`
-rm2kfixwatcher is a tool for auto-fixing PNG files so they work in RPG Maker. It will "watch" an RPG Maker project folder for changes and automatically convert PNG files to an 8-bit PNG (if they do not exceed 255 colors)
+rm2kfixwatcher is a tool for auto-fixing PNG files so they work in RPG Maker. It will "watch" an RPG Maker project folder for changes and automatically convert PNG files to an 8-bit PNG (if they do not exceed 256 colors)
 
 How it works
 -------------------------
@@ -216,6 +216,10 @@ This tool exists so that users can work in paint tools they're comfortable in wi
 				case rm2kpng.ErrRm2kCompatiblePNG:
 					// if file is already compatible, ignore and move on
 					continue
+				case rm2kpng.ErrRm2kPaletteTooBig:
+					// if palette too big,
+					log.Printf("Skipping file: %s, error: %s", path, err)
+					continue
 				default:
 					// unhandled error
 					log.Printf("Skipping file: %s, error: %s", path, err)
@@ -299,6 +303,10 @@ This tool exists so that users can work in paint tools they're comfortable in wi
 					switch err := err.(type) {
 					case rm2kpng.ErrRm2kCompatiblePNG:
 						// if file is already compatible, ignore and move on
+						continue FileUpdateLoop
+					case rm2kpng.ErrRm2kPaletteTooBig:
+						// If file is incompatible, skip but give info to user
+						log.Printf("Failed to convert changed file: %s, error: %s", path, err)
 						continue FileUpdateLoop
 					case
 						// When testing on Windows and saving with MS-Paint

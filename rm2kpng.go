@@ -37,6 +37,21 @@ func (err ErrRm2kDecode) Error() string {
 	return err.err.Error()
 }
 
+// ErrRm2kPaletteTooBig is an error that occurs if the image given exceeds 256 colors.
+// This can occur if the file cannot be converted.
+type ErrRm2kPaletteTooBig struct {
+	paletteLen int
+}
+
+// PaletteLen is the size of the palette of the image you tried to convert
+func (err ErrRm2kPaletteTooBig) PaletteLen() int {
+	return err.paletteLen
+}
+
+func (err ErrRm2kPaletteTooBig) Error() string {
+	return fmt.Sprintf("Palette size is %d, which is too big", err.paletteLen)
+}
+
 const (
 	// maxPaletteLen is the expected palette size of RPG Maker assets
 	maxPaletteLen = 256
@@ -111,13 +126,20 @@ func getRm2kPaletteList(src image.Image) (color.Palette, error) {
 		}
 	}
 	if len(paletteList) > maxPaletteLen {
-		return nil, fmt.Errorf("Palette size is %d, which is too big", len(paletteList))
+		return nil, ErrRm2kPaletteTooBig{
+			paletteLen: len(paletteList),
+		}
 	}
 
-	// NOTE(Jae): Most Rm2k assets I've seen have 256 colors in its palette
-	// regardless of whether they're all used or not but our conversion process
-	// can go lower and still work, so we leave it for now.
-	// We may need to pad out the paletteList with 256 colors latter though.
+	// NOTE(Jae): 2020-10-11
+	// The Rm2k3 editor will blackout / not be able to interpret a Charset if
+	// the palette contains less than 17 colors. My first guess was 16 but that still
+	// didn't work, bumping to 17 worked. My guess is the reasoning is 1 transparent color
+	// and 16 other colors?
+	// Anyway, we pad the remaining colors to be black.
+	for len(paletteList) < 17 {
+		paletteList = append(paletteList, color.RGBA{R: 0, G: 0, B: 0, A: 0})
+	}
 
 	return paletteList, nil
 }
