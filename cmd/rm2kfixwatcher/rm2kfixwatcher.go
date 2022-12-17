@@ -162,6 +162,7 @@ This tool exists so that users can work in paint tools they're comfortable in wi
 		// Get asset folders
 		assetBaseNameList := []string{
 			// Rm2k
+			"Battle",
 			"Charset",
 			"Chipset",
 			"FaceSet",
@@ -178,7 +179,10 @@ This tool exists so that users can work in paint tools they're comfortable in wi
 			"System2",
 		}
 		for _, baseName := range assetBaseNameList {
-			assetFolderPath := path + string(filepath.Separator) + baseName
+			assetFolderPath, err := filepath.Abs(path + string(filepath.Separator) + baseName)
+			if err != nil {
+				log.Fatalf("Cannot get absolute path: %s", err)
+			}
 			if _, err := os.Stat(assetFolderPath); err != nil {
 				continue
 			}
@@ -194,11 +198,11 @@ This tool exists so that users can work in paint tools they're comfortable in wi
 				Callback: func(osPathname string, de *godirwalk.Dirent) error {
 					if !de.IsRegular() {
 						// ignore directories / symlinks / etc
-						return nil
+						return godirwalk.SkipThis
 					}
 					if filepath.Ext(osPathname) != ".png" {
 						// ignore non-png
-						return nil
+						return godirwalk.SkipThis
 					}
 					filesToUpdate = append(filesToUpdate, osPathname)
 					return nil
@@ -249,7 +253,9 @@ This tool exists so that users can work in paint tools they're comfortable in wi
 		log.Fatalf("Unable to start file watcher: %v", err)
 	}
 	for _, assetDir := range rm2kAssetPathList {
-		watcher.Add(assetDir)
+		if err := watcher.Add(assetDir); err != nil {
+			log.Fatalf(`Unable to watch "%s" folder: %v`, filepath.Base(assetDir), err)
+		}
 	}
 
 	//
